@@ -1,0 +1,220 @@
+---
+title: "R data.table 介紹"
+author: "Kemushi54"
+date: "2018/03/17"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(echo = TRUE)
+library(kableExtra)
+```
+
+# package: data.table  
+個人覺得data.table是資料整理上很強大的一個package，尤其當你面對的是一兩百萬筆甚至是更大量的巨量資料。<br/>
+在對資料進行修改或運算時，由於data.table是採直接對資料本身做運算，不創建複本，因此相較於基本的data.frame格式，data.table在面對巨量的資料時，運算速度依舊是非常的快速！
+
+簡單講一下data.frame跟data.table資料運算時的結構差異<br/>
+
+data.frame運算的結構為 **DF[ i, j ]**<br/>
+其中**i**為列的條件，**j**為欄的條件<br/>
+
+data.table運算的結構為 **DT[ i, j, by ]**<br/>
+**i**為列的篩選條件，**j**為欄的篩選條件或運算，除此之外，還多了**by**這個部分，可以依據不同的分類群來整合資料，常用excel樞紐分析做的事情，data.table也都可以輕易做到！ <br/>
+
+廢話不多說，直接進入操作的部分吧~
+
+## 資料下載
+以下教學使用的資料為**GBIF**上的**The Taiwan Breeding Bird Survey Data**資料集
+可以點選[**這裡**](https://www.gbif.org/dataset/f170f056-3f8a-4ef3-ac9f-4503cc854ce0)下載<br/>
+進到網頁中，點選紅色框框內的**DOWNLOAD**就可以了，下載資料需要登入GBIF噢！
+![下載頁面](F:/R markdown/GBIF_BBS.png)
+
+## 環境設定
+安裝以及呼叫data.table等需要用到的套件進來<br/>
+如果已經有安裝過套件了，可以略過安裝的步驟，直接用`library()`叫進來就可以了， <br/>
+這邊也一併介紹另一個在寫程式碼的時候很常用的**管線(pipe)**，屬於**magrittr**這個套件
+
+###安裝套件
+```{r eval = FALSE}
+list.of.packages <- c("data.table", "magrittr", "tidyr")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+```
+###讀入套件
+```{r results = "hide", warning = FALSE, message = FALSE}
+library(data.table)
+library(magrittr)
+library(tidyr)
+```
+
+##資料匯入 
+用`data.table::fread()`函數來讀入資料，`fread()`可以讀csv或txt，這邊以從GBIF下載的BBS Taiwan資料來做示範<br/>
+```{r results = "hide", warning = FALSE}
+BBS <- fread("F:/R markdown/BBS2009-2015/occurrence.txt",
+      sep = "\t", encoding = "UTF-8")
+```
+在`fread()`裡面`sep =`用來設定檔案的分隔符號，這邊的`"\t"`代表tab鍵，如果是讀csv的話通常用`","`做分隔 <br/>
+`encoding =`則用來設定讀入檔案的編碼<br/>
+練習的時候記得要把`fread()`內檔案路徑的部分改成自己放置檔案的路徑喔！
+
+## 資料清理
+先用`str()`看一下原始資料長什麼樣子...<br/>
+在檢視資料的時候除了`str()`，`summary()`跟`names()`也都是很常用指令
+```{r }
+str(BBS)
+```
+
+經過上面`str()`，會看到BBS的原始資料共有235個欄位，但其中有許多欄位全都是空白的NA值，這時候可以先利用`Filter()`一次把這些沒有內容的欄位先刪除掉，讓資料乾淨一些，方便後續的操作。<br/>
+```{r}
+BBS %<>% Filter(function(x)!all(is.na(x)), .)
+```
+上面的`%<>%`是**magrittr**的管線運算子之一，會將式子左邊的資料傳遞到右邊做運算 (在右邊會用 **.** 來表示)，運算完後再將新的資料儲存回原本的變數。
+處理完後會看到BBS資料更新了，剩下58個欄位
+
+## data.table 練習
+利用上面處理完的**BBS**資料來玩玩看data.table吧！
+
+###[ **i**, j, by ]
+EX1 篩出2012年的資料
+```{r eval = FALSE}
+EX1 <- BBS[year == 2012]
+```
+EX2 篩出紀錄數量大於5的資料
+```{r eval = FALSE}
+Ex2 <- BBS[individualCount > 5]
+```
+EX3 篩出都市三俠，白頭翁、綠繡眼、麻雀的資料
+```{r eval = FALSE}
+EX3 <- BBS[vernacularName %in% c("白頭翁", "綠繡眼", "麻雀")]
+```
+EX4 篩出樣區編號開頭為**B**的資料
+```{r eval = FALSE}
+EX4 <- BBS[locationID %like% "B"]
+```
+
+###[ i, **j**, by ]
+EX1 保留物種名稱以及紀錄數量欄位
+```{r eval = FALSE}
+EX1 <- BBS[, 
+           list(vernacularName, 
+                individualCount)]
+```
+EX2 增加新的欄位**elevation**，並且填入**locationID**的第一個字
+```{r eval = FALSE}
+EX2 <- BBS[, 
+           elevation := substr(locationID, 1, 1)]  # substr(x, start, stop)
+```
+
+###[ i, j, **by** ]
+EX1 計算每年每個物種的被記錄到的調查樣點數
+```{r eval = FALSE}
+EX1 <- BBS[, 
+           .(樣點數 = uniqueN(locationID)), 
+           by = list(year, 
+                     vernacularName)]
+```
+EX2 計算每年記錄到的總鳥隻數
+```{r eval = FALSE}
+EX2 <- BBS[, 
+           .(鳥隻數 = sum(individualCount)),
+           by = year]
+```
+
+
+## data.table 應用
+###範例一
+####目標：摘要2010年的調查中，每個樣區的物種資訊(物種數、個體數、平均個體數)
+
+從**BBS**擷取2010年的調查物種清單，包含調查樣區、樣點、調查物種、紀錄數量<br/>
+在**BBS**的資料中，樣區跟樣點資訊被合併在**locationID**欄位裡面，用`separate()`來分開，並且給予新的欄位名稱**Site**與**Point**<br/>
+```{r warning = FALSE}
+BBS2010 <- BBS[year == 2010, list(locationID, 
+                                  species = vernacularName, 
+                                  count = individualCount)] %>%
+  separate(locationID, c("Site", "Point"), "_")
+```
+這邊的`%>%`也是常見的管線運算子，他的功能是將前面運算完的結果傳遞到後面的運算式，傳遞過去的資料一樣用**.**表示<br/>
+<br/>
+計算每個樣區在2010年總共記錄到多少個物種、共多少隻個體，以及各樣區的平均個體數
+```{r warning = FALSE}
+BBS2010.site <- 
+  BBS2010[, .(物種數 = uniqueN(species),
+              總個體數 = .N,
+              平均個體數 = mean(count)),
+          by = list(Site)]
+```
+
+最後看一下計算完的結果
+```{r eval = FALSE}
+View(BBS2010.site)
+```
+
+```{r echo = FALSE}
+kable(BBS2010.site, "html") %>%
+  kable_styling() %>%
+  scroll_box(height = "200px")
+```
+<br/>
+<br/>
+
+###範例二  
+####目標：找出BBS自2009年以來，低中高三個海拔段每年各做了多少樣區及樣點
+在BBS的資料中，樣區代號最前面的英文字母為各樣區所屬的海拔段(A開頭的樣區為低海拔樣區；B開頭的樣區為中海拔樣區；C開頭的樣區為高海拔樣區)，因此我們可以利用這樣的資料特性，給定一個新欄位**elevation**，然後用**elevation**分類群來計算我們要的結果
+
+從**BBS**中擷取需要的資料並且增加新欄位**elevation**，依據樣區編號開頭的英文字母填入所屬的海拔段<br/>
+利用`uniqueN()`計算每年每個海拔段的樣區與樣點數量
+
+```{r warning = FALSE}
+BBS.agg <- 
+  BBS[, list(year, locationID)] %>%   # 取出需要的欄位
+  separate(locationID, c("Site", "Point"), "_") %>%   # 分開樣區跟樣點資訊
+  .[Site %like% "A", elevation := "低海拔"] %>%   #樣區名稱包含A的樣區，elevation填入"低海拔"
+  .[Site %like% "B", elevation := "中海拔"] %>%   #樣區名稱包含B的樣區，elevation填入"中海拔"
+  .[Site %like% "C", elevation := "高海拔"] %>%   #樣區名稱包含C的樣區，elevation填入"高海拔"
+  .[, .(N.site = uniqueN(Site),   #計算樣區數
+        N.point = uniqueN(Point)),    #計算樣點數
+    by = list(year, elevation)]   #分類群依據year跟elevation
+```
+看一下整理完的結果
+```{r eval = FALSE}
+View(BBS.agg)
+```
+
+```{r echo = FALSE}
+kable(BBS.agg, "html") %>%
+  kable_styling() %>%
+  scroll_box(height = "200px")
+```
+
+但是這樣做完後資料是長型式的，我們希望能轉成寬型式的，比較好判讀，<br/>
+所以接著用`dcast()`來轉資料型式，`dcast(資料, 轉換公式, value.var = "填入的資訊來源")`<br/>
+反之如果今天是要將寬型式的資料轉成長型式的，則要用`melt()`<br/>
+`value.var =`用來選擇填入新表格的資訊，另外也可以用`fun =`來做運算，這邊我們選擇直接填入樣區數量。<br/>
+記得要用" "來包住要填入的欄位名稱！
+```{r}
+BBS.dcast <- 
+  dcast(BBS.agg, elevation ~ year, value.var = "N.site")
+  
+```
+看一下轉換完的寬型式資料
+```{r eval = FALSE}
+View(BBS.dcast)
+```
+
+```{r echo = FALSE}
+kable(BBS.dcast, "html") %>%
+  kable_styling() %>%
+  scroll_box(width = "800px", height = "200px")
+```
+
+----
+以上就是這次data.table基本介紹，data.table還有很多的應用是這篇沒有納入的，如果你想知道如何用data.table做某種運算，但是這篇沒有列出來的，歡迎提出來一起來動動腦~~ 另外，要達到相同運算結果的方法有很多種，上面僅只是我個人習慣的寫法，不是唯一，可以多估狗看看別人的寫法，找出自己喜歡的方式。<br/>
+最後一點小提醒，這一篇沒有花太多篇幅在資料清理的部分，像是沒有去確認物種清單是否有非鳥類的物種(實際上有！)，還有在範例二，區分樣區海拔段的時候，沒有特別去檢查有沒有例外的存在...等，所以如果實際上要使用BBS資料來分析的話，記得要多花一點心思在資料清理的部分，不然會得到錯誤的資訊噢！
