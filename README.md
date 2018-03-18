@@ -2,7 +2,7 @@
 一些常用的R package教學，包含基本操作以及應用範例
 
 ## 資料探勘
-#### [data.table教學](https://github.com/kemushi54/R-basic/blob/master/data_table.html)
+#### [data.table教學]()
 
 ## 空間資料處理
 
