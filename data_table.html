@@ -391,6 +391,7 @@ library(tidyr)</code></pre>
 <pre class="r"><code>EX1 &lt;- BBS[, 
            list(vernacularName, 
                 individualCount)]</code></pre>
+<p>這邊給個小練習，試看看以下兩個取欄位的寫法結果跟上面有沒有不同 <code>EX1.1 &lt;- BBS[, c(vernacularName, individualCount)]</code> <code>EX1.2 &lt;- BBS[, c(&quot;vernacularName&quot;, &quot;individualCount&quot;)]</code></p>
 <p>EX2 增加新的欄位<strong>elevation</strong>，並且填入<strong>locationID</strong>的第一個字</p>
 <pre class="r"><code>EX2 &lt;- BBS[, 
            elevation := substr(locationID, 1, 1)]  # substr(x, start, stop)</code></pre>
@@ -406,6 +407,50 @@ library(tidyr)</code></pre>
 <pre class="r"><code>EX2 &lt;- BBS[, 
            .(鳥隻數 = sum(individualCount)),
            by = year]</code></pre>
+</div>
+<div id="dtdt2-on-a" class="section level3">
+<h3>DT[DT2, on = “a”]</h3>
+<div id="adata.tabledtdt2" class="section level4">
+<h4>利用相同的欄位<strong>a</strong>來合併兩個data.table，<strong>DT</strong>與<strong>DT2</strong></h4>
+<p>EX 將鳥類名錄中的遷留屬性(Bird.list$Taiwan)對應到BBS資料(BBS)當中</p>
+<pre class="r"><code>#取BBS資料當中的物種中文名稱跟數量欄位
+BBS.species &lt;-
+  BBS[, list(vernacularName, individualCount)]
+
+#看一下資料
+head(BBS.species, 3)</code></pre>
+<pre><code>##    vernacularName individualCount
+## 1:           麻雀              12
+## 2:           麻雀               8
+## 3:         白頭翁               2</code></pre>
+<pre class="r"><code>#接著把要對應的鳥類名錄叫進來
+Bird.list &lt;- 
+  fread(&quot;F:/R markdown/Bird_List.txt&quot;,
+        sep = &quot;\t&quot;, encoding = &quot;UTF-8&quot;) %&gt;%
+  # 取資料裡面的鳥類中文俗名(C.CommonName)跟在台灣的遷留屬性(Taiwan)
+  # 把C.CommonName重新取名為與BBS資料當中對應的vernacularName
+  .[, list(vernacularName = C.CommonName,
+           Taiwan)]
+#確認一下欄位名稱有修改對
+head(Bird.list, 3)</code></pre>
+<pre><code>##    vernacularName Taiwan
+## 1:           樹鴨     迷
+## 2:           鴻雁 冬、稀
+## 3:       寒林豆雁 冬、稀</code></pre>
+<pre class="r"><code>#把Bird.list與BBS資料合併
+# 注意on後面一定要用&quot;&quot;來包住欄位名稱，可以同時有多個欄位作為索引
+BBS.species %&lt;&gt;% Bird.list[., on = &quot;vernacularName&quot;]
+
+#確認合併完後的新資料
+head(BBS.species)</code></pre>
+<pre><code>##    vernacularName        Taiwan individualCount
+## 1:           麻雀        留、普              12
+## 2:           麻雀        留、普               8
+## 3:         白頭翁        留、普               2
+## 4:       珠頸斑鳩        留、普               1
+## 5:       灰頭鷦鶯        留、普               1
+## 6:       紅尾伯勞 冬、普/過、普               1</code></pre>
+</div>
 </div>
 </div>
 <div id="data.table-" class="section level2">

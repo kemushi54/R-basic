@@ -107,6 +107,11 @@ EX1 <- BBS[,
            list(vernacularName, 
                 individualCount)]
 ```
+這邊給個小練習，試看看以下兩個取欄位的寫法結果跟上面有沒有不同
+`EX1.1 <- BBS[, c(vernacularName, individualCount)]`
+`EX1.2 <- BBS[, c("vernacularName", "individualCount")]`
+
+
 EX2 增加新的欄位**elevation**，並且填入**locationID**的第一個字
 ```{r eval = FALSE}
 EX2 <- BBS[, 
@@ -127,7 +132,36 @@ EX2 <- BBS[,
            .(鳥隻數 = sum(individualCount)),
            by = year]
 ```
+###DT[DT2, on = "a"] 
+####利用相同的欄位**a**來合併兩個data.table，**DT**與**DT2**
+EX 
+將鳥類名錄中的遷留屬性(Bird.list$Taiwan)對應到BBS資料(BBS)當中
+```{r warning = FALSE}
+#取BBS資料當中的物種中文名稱跟數量欄位
+BBS.species <-
+  BBS[, list(vernacularName, individualCount)]
 
+#看一下資料
+head(BBS.species, 3)
+
+#接著把要對應的鳥類名錄叫進來
+Bird.list <- 
+  fread("F:/R markdown/Bird_List.txt",
+        sep = "\t", encoding = "UTF-8") %>%
+  # 取資料裡面的鳥類中文俗名(C.CommonName)跟在台灣的遷留屬性(Taiwan)
+  # 把C.CommonName重新取名為與BBS資料當中對應的vernacularName
+  .[, list(vernacularName = C.CommonName,
+           Taiwan)]
+#確認一下欄位名稱有修改對
+head(Bird.list, 3)
+
+#把Bird.list與BBS資料合併
+# 注意on後面一定要用""來包住欄位名稱，可以同時有多個欄位作為索引
+BBS.species %<>% Bird.list[., on = "vernacularName"]
+
+#確認合併完後的新資料
+head(BBS.species)
+```
 
 ## data.table 應用
 ###範例一
