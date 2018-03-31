@@ -3,6 +3,7 @@
 
 ## 資料探勘
 #### [data.table教學](https://kemushi54.github.io/R-basic/data_table.html)
+#### [取代迴圈的apply家族](https://kemushi54.github.io/R-basic/apply_family.html)
 
 ## 空間資料處理
 
