@@ -1,0 +1,187 @@
+---
+title: "取代迴圈的 apply 家族"
+author: "Kemushi54"
+date: "2018年3月30日"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float:
+      collapsed: false
+      smooth_scroll: false
+---
+
+##apply 家族
+資料分析經常會需要處理相似或是重複性質很高的的事情，這個時候我們通常第一個想到的，是靠寫迴圈來解決，但當如果是要一次處理幾百或是幾千次相同的事情時，單靠迴圈其實很容易會降低程式執行的效率。這時候就可以試著用 R 內建的 apply 家族，使用**向量**的方式來解決。<br/>
+這邊介紹 4 個 apply 家族的成員，包含 `apply()`、`lapply()`、`sapply()`以及 `mapply()`，其中 lapply 的 l 代表 list，也就是透過 lapply 函數操作完之後，會回傳一個 list；sapply 的 s 代表 simple，意思是透過函數 sapply 回傳的結果是將 list 形式簡單化 (simplified) 後的 vector (至於實際上有沒有比較簡單，就見仁見智啦，我自己是偏好用 lapply 來處理資料...)；mapply 的 m 指的則是 multivariate，意思是可以同時使用多個變數，詳細在後面會有示範~<br/>
+
+在開始之前，先呼叫這次會用到的 packages 進來，<br/>
+apply 家族位在 R 內建的 base 裡面，所以不用特別呼叫出來
+```{r}
+library(data.table)
+library(magrittr)
+```
+
+###apply(X, MARGIN, FUN, ...)
+apply 的用法是將一個函數 **FUN** 套用在指定的資料集 **X** 中的每個元素上，透過 **MARGIN** 參數來指定函數 **FUN** 是要依照列 (by row = 1) 還是欄 (by column = 2) 來執行。
+
+先創造我們示範用的資料 data
+```{r}
+data <- array(1:50, c(5, 10))
+#看一下資料矩陣的樣子
+data
+```
+<br/>
+
+####EX1 計算上面資料每一列的加總
+```{r}
+apply(data, 1, sum)
+```
+在上面的 `apply()` 中，`data` 是我們的資料 (矩陣)，`1` 告訴 apply 我們的計算是 **by row**，`sum` 是告訴 apply 我們要算每個列的加總。<br/>
+<br/>
+
+####EX2 計算上面矩陣每一欄的平方和
+```{r}
+apply(data, 2, function(a)sum(a^2))
+```
+跟 EX1 一樣，data 是我們要處理的資料，`2` 告訴 apply 這次的計算要 **by column**，而後面的 `function(a)sum(a^2)` 是用來告訴 apply 要做 `sum(a^2)` 這件事情，
+其中 `function(a)` 當中的 a 則是告訴 apply 我們的資料 **data** 的每一欄在後面的函式當中會用 a 來代表，也可以換成其他的符號，但是後面的函數中也要使用相同的符號例如 `function(i) sum(i^2)`這樣 apply 才看得懂。<br/>
+<br/>
+
+####EX3 也可以處理稍微複雜一點點的事情...
+找出上面資料中，每一列可以被 7 整除的數字有幾個
+```{r}
+apply(data, 1, function(x) length(x[x %% 7 == 0]))
+```
+%% 代表取餘數
+
+###lapply(X, FUN, ...)
+lapply 和 apply 的功能有點類似，都是將運算的公式帶入到輸入檔案的每個元素上，不過在 lapply 當中不能指定要 by row 還是 by column，會逐個項目去運算，所以這裡的資料 X 通常會放一維的 vector，在操作上會比較清楚。
+
+####EX1 計算 1 到 3 每個數字 x 的 x 次方
+```{r}
+EX1 <- lapply(1:3, function(x)x^x)
+#看一下結果
+EX1
+```
+這裡可以看到 lapply 回傳的是一個 list，list 內共有三個 list，而每一個 list 內則各有一個值。
+用 `class()` 來確認一下他們的屬性
+```{r}
+# EX1的屬性
+class(EX1)
+# EX1內第一項的屬性
+class(EX1[1])
+# EX1內第一項裡面的第一項的屬性
+class(EX1[[1]])
+```
+瞭解每一個輸出結果對應的屬性對 lapply 的運用來說很重要，所以一定要弄清楚~！<br/>
+<br/>
+
+####EX2 來做點不一樣的，批次讀檔案
+下面這些是從 GBIF 上由台灣所發布的開放資料，共有 7 個資料集，每個資料夾內的資料結構都是一樣的。在這些資料當中，我們感興趣的是每個資料夾當中的 occurrence.txt，並且希望能夠一次讀取這 7 個資料夾內的 occurrence.txt，底下就試著用 lapply 做看看。 <br/>
+![folder](F:/R markdown/folder.png)
+
+先用 `list.files()` 讀檔案名稱
+```{r}
+file.name <- list.files("F:/R markdown/GBIF", full.names = TRUE)
+# full.names = TRUE 表示要回傳完整的檔案路徑，有興趣可以比較跟full.names = FALSE回傳的結果有什麼不同
+
+# 看一下file.name裡面是什麼樣子
+file.name
+```
+接著用 `lapply()` 批次讀上面這些資料夾路徑中的 occurrence 文字檔 (occurrence.txt)
+```{r eval = FALSE}
+all.data <- 
+  lapply(file.name, function(x)
+    fread(file.path(x, "occurrence.txt")))
+```
+這邊輸出的 **all.data** 是一個 list 包含 7 個項目，其中每個項目都是一個 data.table。<br/>
+<br/>
+在實際分析資料時，我們比較常的做法，是將這些獨立的表合併成一個大表，接著再進行後續的資料篩選或計算等，而非一個一個表分開去處理，這時候就可以搭配 `do.call()` 來做這件事。
+```{r eval = FALSE}
+all.data %<>% do.call(rbind, .)
+```
+`%<>%` 在前一章 data.table 的介紹中有提過，會將前面的資料往後傳遞做運算，待運算完後再傳回原本的變數。<br/>
+這邊透過 `%<>%` 將剛才讀取的資料 list 傳遞給 `do.call()`，然後用 `rbind` 將各個 list 依據相同的欄位把各個表格的列接成一個大表。記得 rbind 逗號後面要接資料，不要漏掉了。<br/>
+另外在使用 `do.call(rbind, x)` 時，一定要確認 x 內每一項的欄位數目、名稱、順序都是一致的，才可以順利執行！
+
+另外式如果善用 `%>%` 管線運算子，EX2 也可以改寫成下面這樣
+```{r eval = FALSE}
+all.data <- 
+  list.files("F:/R markdown/GBIF", full.names = TRUE) %>%
+  lapply(function(x)
+    fread(file.path(x, "occurrence.txt"))) %>%
+  do.call(rbind, .)
+```
+
+###sapply(X, FUN, ...)
+sapply 在功能上與 lapply 基本上是一樣的，都是餵給一個 list，然後依據後面指定的功能函數來一項一項做運算，
+不過跟 lapply 不同的是，sapply 會回傳一個 vector，而不是 list。
+
+####EX1 計算 1 到 3 每個數字 x 的 x 次方
+```{r}
+EX1 <- sapply(1:3, function(x)x^x)
+#看一下結果，並且跟上面lapply的EX1的結果做比較
+EX1
+```
+<br/>
+####EX2 計算每一欄的平均
+這邊先創造另一個資料 data2
+```{r}
+data2 <- data.frame(height = c(157, 172, 168),
+                    weight = c(53, 70, 61))
+#看一下資料的樣子
+data2
+```
+用 sapply 算每一個欄位的平均值
+```{r}
+sapply(data2, mean)
+```
+輸出的結果也會包含欄位名稱~<br/>
+<br/>
+
+###mapply(FUN, ...)
+`mapply()` 可以同時指定多個 list，跟前面三個 apply 家族的成員相比會稍微複雜一些，另外是參數的位置也不太一樣，在 mapply 中，運算函數放前，list 在後。假設今天給 mapply 三個 list{a, b, c}，mapply 會分別取三個 list 的第一項去做第一次運算，然後換三個 list 的第二項去做第二次運算...依此類推。<br/>
+<br/>
+
+####EX
+給個簡單的應用例子，今天我們想要把前面提到 GBIF 資料夾中，每個資料夾內的 occurence 文字檔一口氣轉成 csv 檔，並且以原本資料夾的名字為新的檔案命名，然後另外存到 F:/Data 這個資料夾中，雖然這件事本身有點莫名(?)，而且我寫到一半發現其實用 lapply 就好了:P 不過可以用來讓我們稍微了解 mapply 的運作，就還是用他當例子吧XD。 <br/>
+<br/>
+首先，要先準備我們的資料，這邊需要兩個 list，<br/>
+一個是我們的檔案，另一個是我們檔案的新路徑
+
+準備檔案，輸出一個 list，list 內每一項都是一個 data.table
+```{r eval = FALSE}
+data.all <-
+  list.files("F:/R markdown/GBIF", full.names = TRUE) %>%
+  lapply(function(x)fread(file.path(x, "occurrence.txt"), sep = "\t"))
+```
+
+準備新的路徑，輸出一個 list，list 內每一項都是跟前面檔案互相對應的新路徑名稱 (character)
+```{r}
+dir.new <- list.files("F:/R markdown/GBIF", full.names = FALSE) %>%
+  lapply(function(x)paste0("F:/Data/", x, ".csv"))
+
+# 確認一下新路徑
+dir.new
+```
+
+檔案準備好後，就可以用 mapply 來轉存檔案了
+```{r eval = FALSE}
+mapply(function(a, b) fwrite(a, b, sep = ","), 
+       a = data.all, b = dir.new) %>%
+  invisible()
+```
+`fwrite(x, file = "", sep = ",")` 是 data.table 中用來輸出檔案的函數，<br/>
+第一個參數放要輸出的變數，第二個參數指定輸出的檔案路徑 (包含檔案格式)，`sep =` 用來指定檔案內的分隔符號。
+最後的 `invisible()` 是用來隱藏執行後任何顯示在 console 的結果，讓版面可以乾淨一些。<br/>
+<br/>
+上面的 mapply 如果用 lapply 來改寫，可以像下面這樣，另外也還有其他種寫法，就不一一列在這邊了。
+```{r eval = FALSE}
+lapply(1:length(data.all), function(x)
+  fwrite(data.all[[x]], dir.new[[x]], sep = ",")) %>%
+  invisible()
+```
+
+<br/>
+以上就是這次 apply 家族的介紹，實際應用上我覺得最實用的是 `lapply()` 搭配 `do.call()`，不過還是看個人習慣。另外說一下我自己對 lapply 跟 for 迴圈之間的選擇，lapply  的確可以增加程式執行的效率，不過有時候他的可讀性跟迴圈比起來比較差，所以當在處理比較複雜一些的事情，程式碼又有可能會需要跟別人交流時，我有些時候還是會選擇寫 for 迴圈，不過當事情相對簡單，像是重複讀取檔案、分隔欄位、增減欄位之類的，我就會用 lapply 來處理了。
