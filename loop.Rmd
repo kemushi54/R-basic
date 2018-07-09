@@ -1,0 +1,237 @@
+---
+title: "for 迴圈與 lapply"
+author: "Kemushi54"
+date: "2018年7月8日"
+output: 
+  html_document
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+knitr::opts_chunk$set(echo = TRUE)
+library(kableExtra)
+```
+
+迴圈是程式碼中一種常見的控制流程。指的是一段在程式中只出現一次，但隨著條件的設置，會連續執行特定次數、針對某一集合中的所有項目執行一次，或是在達到特定條件時結束運算的一段程式碼。常見的有 for 迴圈 (for loop)、while 迴圈 (while loop)。這一篇介紹的是 for 迴圈，還有將 for 迴圈改寫成 apply 系列函數中的 lapply。
+<br/>
+
+假設今天想要分別印出 1 到 10 的平方，在 R 裡面要計算平方的程式碼為 `x^2` ，最土法煉鋼的寫法是像下面這樣，將要重複執行的程式碼複製貼上 10 次，然後將 1 到 10 分別帶入 x 的位置。
+
+```{r}
+print(c(1^2,
+        2^2,
+        3^2,
+        4^2,
+        5^2,
+        6^2,
+        7^2,
+        8^2,
+        9^2,
+        10^2))
+```
+<br/>
+但如果今天是要計算 1 到 1000，甚至是到更大的數字的平方呢？像上面那樣複製程式碼的做法就顯的有些不切實際。當我們要重複做的事情有一定的規則可循，像是要針對一個變數中的每一項目去操作，或是同樣的事情要重複執行一定次數，就可透過 for 迴圈來簡化程式碼。<br/>
+<br/>
+for 迴圈的架構像這樣：
+```{r eval = FALSE}
+for (i in x){
+    # 每次迭代要執行的程式
+}
+```
+
+其中 i 告訴 R 在每一次迭代（iteration）中要改變的地方在哪裡，x 是每一次的迭代在執行時的實際項目，在第一次的迭代中的 i 是 x 的第一項 (x[1])；第二次的迭代中的 i 是 x 的第二項 (x[2])；以此類推，然後在每一次迭代時，都會執行大括號 {} 裡面的程式，x 有多少個項目這段迴圈就會執行多少次。
+
+
+像上面平方的例子用 for 迴圈可以改寫成這樣...
+```{r}
+for (i in 1:10){
+  print(i^2)
+}
+```
+x 是 1 到 10 的字串，然後在後面的程式碼中，透過 i 來指定每一次迭代要改變的是計算平方的數字。
+<br/>
+<br/>
+但是在 R 語言中，其實要盡量避免使用 for 迴圈，理由是 for 迴圈的效率差，當處理的資料量或次數達到一定程度時，很容易拖慢整體的運算速度。為了提升效率，在 R 語言的撰寫上會盡可能使用向量化 (vectorize) 運算的方式來處理各種重複性的運算，除了可讓程式碼更容易閱讀之外 (不過理解又是另外一回事XD)，執行速度也會比一般性的迴圈高出許多。
+<br/>
+<br/>
+簡單的向量化運算概念是像下面這樣...<br/>
+今天我們有 100 萬個人的身高跟體重，想計算這些人的 BMI 指數
+<br/>
+我們先產生身高體重的資料
+```{r}
+# 用 runif 隨機產生 100 萬人的身高 (單位：公分)
+height <- runif(1000000)*40 + 165
+
+# 用 runif 隨機產生 100 萬人的體重 (單位：公斤)
+weight <- runif(1000000)*30 + 60
+
+# 合併成data.frame
+data <- data.frame(height = height,
+                   weight = weight)
+```
+<br/>
+<br/>
+
+#### BMI 公式：BMI = 體重(公斤) / 身高平方(平方公尺) <br/>
+
+#### 使用傳統的 for 迴圈來運算..
+
+```{r eval = FALSE}
+# 先指定一個list來存放等一下計算出來的BMI
+BMI <- list()
+
+# 對資料表當中的每一列(每一個人)執行BMI的運算
+for (i in 1:nrow(data)){
+  BMI[i] <- data$weight[i] / ((data$height[i]/100)^2)
+}
+
+```
+
+<br/>
+
+#### 使用向量化的方式來做運算
+
+只要一行程式碼就可以搞定啦！
+
+```{r eval = FALSE}
+BMI <- weight / ((height/100)^2)
+```
+
+<br/>
+然而不是所有的程式邏輯都可以很直接的使用向量化運算來處理，當遇到無法修改成向量化程式碼的情況時，則會建議用 apply 家族來處理，apply 家族在本質上仍然是迴圈，不過畢竟是 R 本身內建的函數，所以使用上效能還是會比 for 迴圈來的好，而且 lapply 還有別人改寫好的平行運算套件，真正遇到一次會跑很久然後也需要進行多次的運算，就可以開啟多核心，開外掛來處理啦！
+
+<br/>
+
+#### 使用 lapply 運算
+
+上面的範例如果用 apply 家族中的 `lapply()` 可以改寫成這樣
+
+```{r eval = FALSE}
+BMI <- 
+  lapply(1:nrow(data), function(i)
+    data$weight[i] / ((data$height[i]/100)^2))
+```
+在 `lapply()` 中，`1:nrow(data)` 指的是針對 1:row(data) 中的每一項都分別進行運算，而在執行的運算中，跟 for 迴圈一樣用 i 來指定要改變的項目位置在哪裡 (i 可以改成其他字母)。詳細的 lapply 介紹請見 [取代迴圈的 apply 家族](https://kemushi54.github.io/R-basic/apply_family.html)。
+
+<br/>
+
+#### 這邊我們用 `system.time()` 來比較三種方法的運算效能。
+
+```{r }
+# 1. 使用 for 迴圈
+system.time({
+  BMI <- list()
+  for (i in 1:nrow(data)){
+  BMI[i] <- data$weight[i] / ((data$height[i]/100)^2)
+  }
+})
+
+# 2. 使用向量化運算
+system.time(
+  bmi <- weight / ((height/100)^2)
+)
+
+# 3. 使用 lapply
+system.time(
+  bmi.L <- lapply(1:nrow(data), function(i)
+    data$weight[i] / ((data$height[i]/100)^2))
+)
+```
+
+從總耗時 (elapsed) 來看可以發現在效能上，向量化運算 >> lapply > for 迴圈。<br/>
+所以以後要寫重複執行程式的時候，不能改寫成向量運算的話建議至少也要用 lapply 來寫，只要能寫成迴圈的程式碼就一定可以改寫成 lapply！寫成 lapply 的好處是，如果覺得效率不夠高還可以改寫成平行運算來加速~~~~
+
+<br/>
+<br/>
+
+#### 底下示範 2 個例子分別用 for 迴圈、lapply 來撰寫，希望可以讓大家更了解 lapply 的語法。
+
+### 範例一 批次讀檔案
+
+#### for 迴圈
+```{r eval = FALSE}
+# 先指定一個list來存放等一下讀出來的檔案
+data <- list()
+# 用list.file列出D:/filepath資料夾內csv檔的檔案路徑
+file.name <- list.files("D:/filepath", 
+                        pattern = ".csv", 
+                        full.names = TRUE)
+# 用for迴圈來讀檔案
+for (i in 1:length(file.name){
+  data[[i]] <- fread(file.name[i])
+})
+```
+
+#### lapply
+
+```{r eval = FALSE}
+# 用list.file列出D:/filepath資料夾內csv檔的檔案路徑
+file.name <- list.files("D:/filepath", 
+                        pattern = ".csv", 
+                        full.names = TRUE)
+# 用lapply來讀檔案
+data <- lapply(1:length(file.name), function(i)
+  fread(file.name[i]))
+
+# 也可以改寫成這樣
+data <- lapply(file.name, function(i)
+  fread(i))
+```
+
+### 範例二 Bootstrap method for mixed-model
+lapply 也可以處理多個步驟的 function~
+
+
+- 從資料母體 (dataset) 中隨機抽取每一個分群 (ZONE8 與 Year.s) 各 200 筆不重複的資料組成子分析資料 (boot.data)
+- 用子分析資料 (boot.data) 來進行 mixed-model 分析
+- 擷取 mixed model 的截距跟斜率輸出成 data.table
+
+以上步驟重複執行1000次。
+
+<br/>
+
+#### for 迴圈寫法
+
+```{r eval = FALSE}
+b.coef <- list()
+for (i in 1:1000){  # 1:1000 = 執行1000次
+  # 隨機取樣
+  boot.data <-
+    dataset[, .SD[sample(.N, min(.N,200), replace = FALSE)],
+            by = list(ZONE8, Year)]
+  
+  # 用boot.data來跑GLMM
+  boot.logit <-
+    glmer(Count.F ~ Year.s + (0 + Year.s|ZONE8),
+          data = boot.data,
+          family = poisson)
+  
+  # 輸出斜率與截距，輸出到 b.coef 裡面
+  b.coef[[i]] <- fixef(boot.logit)
+}
+b.coef <- do.call(rbind, b.coef) %>% data.table
+```
+
+#### lapply 寫法
+
+```{r eval = FALSE}
+b.coef <- lapply(1:1000, function(i){  # 1:1000 = 執行1000次
+    # 隨機取樣
+    boot.data <-
+      dataset[, .SD[sample(.N, min(.N,200), replace = FALSE)],
+               by = list(ZONE8, Year)]
+    
+    # 用boot.data來跑GLMM
+    boot.logit <-
+      glmer(Count.F ~ Year.s + (0 + Year.s|ZONE8),
+            data = boot.data,
+            family = poisson)
+    
+    # 輸出斜率與截距，在lapply中要用 return() 來指定要回傳的變數
+    return(fixef(boot.logit))
+  }) %>% 
+  do.call(rbind, .) %>% 
+  data.table
+```
+
+
